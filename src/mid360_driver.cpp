@@ -120,11 +120,11 @@ namespace mid360_driver {
             if (header.time_type == TimestampType::kTimestampTypeNoSync) {
                 auto [iter, inserted] = delta_time_map.try_emplace(sender_endpoint.address());
                 if (inserted) {
-                    header_timestamp += iter->second;
-                } else {
                     auto now = static_cast<double>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) * 1e-9;
                     iter->second = now - header_timestamp;
                     header_timestamp = now;
+                } else {
+                    header_timestamp += iter->second;
                 }
             }
             points.clear();
@@ -198,11 +198,11 @@ namespace mid360_driver {
             if (header.time_type == TimestampType::kTimestampTypeNoSync) {
                 auto [iter, inserted] = delta_time_map.try_emplace(sender_endpoint.address());
                 if (inserted) {
-                    header_timestamp += iter->second;
-                } else {
                     auto now = static_cast<double>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) * 1e-9;
                     iter->second = now - header_timestamp;
                     header_timestamp = now;
+                } else {
+                    header_timestamp += iter->second;
                 }
             }
             const auto &raw_imu = *reinterpret_cast<const Imu *>(buffer + sizeof(DataHeader));
