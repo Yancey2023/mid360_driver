@@ -29,7 +29,7 @@ jobs:
         run: sudo apt-get install -y libasio-dev
       
       - name: 签出项目
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: 编译
         run: source /opt/ros/humble/setup.sh && colcon build
