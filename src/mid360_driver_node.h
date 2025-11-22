@@ -24,19 +24,15 @@ namespace mid360_driver {
         std::vector<Point> points_to_publish_temp;
         std::vector<ImuMsg> imu_to_publish_temp;
         bool is_init = false;
-        std::string lidar_topic;
-        std::string imu_topic;
         std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::PointCloud2>> pointcloud_publisher;
         std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::Imu>> imu_publisher;
 
     public:
         LidarPublisher() = default;
 
-        void set_topic(const std::string &lidar_topic, const std::string &imu_topic);
+        void make_sure_init(rclcpp::Node &node, const std::string &lidar_topic, const std::string &imu_topic);
 
-        void set_topic_with_lidar_ip(const std::string &lidar_topic, const std::string &imu_topic, const asio::ip::address &lidar_ip);
-
-        void make_sure_init(rclcpp::Node &node);
+        void make_sure_init(rclcpp::Node &node, const std::string &lidar_topic, const std::string &imu_topic, const asio::ip::address &lidar_ip);
 
         void on_receive_pointcloud(const std::vector<Point> &points);
 

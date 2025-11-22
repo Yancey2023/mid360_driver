@@ -8,30 +8,29 @@
 
 namespace mid360_driver {
 
-    void LidarPublisher::set_topic(const std::string &lidar_topic, const std::string &imu_topic) {
-        this->lidar_topic = lidar_topic;
-        this->imu_topic = imu_topic;
-    }
-
-    void LidarPublisher::set_topic_with_lidar_ip(const std::string &lidar_topic, const std::string &imu_topic, const asio::ip::address &lidar_ip) {
-        auto lidar_ip_bytes = lidar_ip.to_v4().to_bytes();
-        std::string lidar_ip_str;
-        lidar_ip_str.push_back('_');
-        lidar_ip_str.append(std::to_string(static_cast<int>(lidar_ip_bytes[0])));
-        lidar_ip_str.push_back('_');
-        lidar_ip_str.append(std::to_string(static_cast<int>(lidar_ip_bytes[1])));
-        lidar_ip_str.push_back('_');
-        lidar_ip_str.append(std::to_string(static_cast<int>(lidar_ip_bytes[2])));
-        lidar_ip_str.push_back('_');
-        lidar_ip_str.append(std::to_string(static_cast<int>(lidar_ip_bytes[3])));
-        this->lidar_topic = lidar_topic + lidar_ip_str;
-        this->imu_topic = imu_topic + lidar_ip_str;
-    }
-
-    void LidarPublisher::make_sure_init(rclcpp::Node &node) {
+    void LidarPublisher::make_sure_init(rclcpp::Node &node, const std::string &lidar_topic, const std::string &imu_topic) {
         if (!is_init) {
             pointcloud_publisher = node.create_publisher<sensor_msgs::msg::PointCloud2>(lidar_topic, 1000);
             imu_publisher = node.create_publisher<sensor_msgs::msg::Imu>(imu_topic, 1000);
+            is_init = true;
+        }
+    }
+
+    void LidarPublisher::make_sure_init(rclcpp::Node &node, const std::string &lidar_topic, const std::string &imu_topic, const asio::ip::address &lidar_ip) {
+        if (!is_init) {
+            auto lidar_ip_bytes = lidar_ip.to_v4().to_bytes();
+            std::string lidar_ip_str;
+            lidar_ip_str.push_back('_');
+            lidar_ip_str.append(std::to_string(static_cast<int>(lidar_ip_bytes[0])));
+            lidar_ip_str.push_back('_');
+            lidar_ip_str.append(std::to_string(static_cast<int>(lidar_ip_bytes[1])));
+            lidar_ip_str.push_back('_');
+            lidar_ip_str.append(std::to_string(static_cast<int>(lidar_ip_bytes[2])));
+            lidar_ip_str.push_back('_');
+            lidar_ip_str.append(std::to_string(static_cast<int>(lidar_ip_bytes[3])));
+            pointcloud_publisher = node.create_publisher<sensor_msgs::msg::PointCloud2>(lidar_topic + lidar_ip_str, 1000);
+            imu_publisher = node.create_publisher<sensor_msgs::msg::Imu>(imu_topic + lidar_ip_str, 1000);
+            is_init = true;
         }
     }
 
@@ -145,44 +144,37 @@ namespace mid360_driver {
         double lidar_publish_time_interval = declare_parameter<double>("lidar_publish_time_interval");
         bool is_topic_name_with_lidar_ip = declare_parameter<bool>("is_topic_name_with_lidar_ip");
         if (!is_topic_name_with_lidar_ip) {
-            lidar_publisher.set_topic(lidar_topic, imu_topic);
-            lidar_publisher.make_sure_init(*this);
+            lidar_publisher.make_sure_init(*this, lidar_topic, imu_topic);
         }
         mid360_driver = std::make_unique<mid360_driver::Mid360Driver>(
                 io_context,
                 asio::ip::make_address(host_ip),
-                [this, lidar_topic, imu_topic, is_topic_name_with_lidar_ip](const asio::ip::address &lidar_ip, const std::vector<Point> &points) {
+                [this, is_topic_name_with_lidar_ip](const asio::ip::address &lidar_ip, const std::vector<Point> &points) {
                     if (is_topic_name_with_lidar_ip) {
-                        auto [iter, inserted] = muti_lidar_publisher.try_emplace(lidar_ip);
-                        if (inserted) {
-                            iter->second.set_topic_with_lidar_ip(lidar_topic, imu_topic, lidar_ip);
-                        }
+                        auto iter = muti_lidar_publisher.try_emplace(lidar_ip).first;
                         iter->second.on_receive_pointcloud(points);
                     } else {
                         lidar_publisher.on_receive_pointcloud(points);
                     }
                 },
-                [this, lidar_topic, imu_topic, is_topic_name_with_lidar_ip](const asio::ip::address &lidar_ip, const ImuMsg &imu_msg) {
+                [this, is_topic_name_with_lidar_ip](const asio::ip::address &lidar_ip, const ImuMsg &imu_msg) {
                     if (is_topic_name_with_lidar_ip) {
-                        auto [iter, inserted] = muti_lidar_publisher.try_emplace(lidar_ip);
-                        if (inserted) {
-                            iter->second.set_topic_with_lidar_ip(lidar_topic, imu_topic, lidar_ip);
-                        }
+                        auto iter = muti_lidar_publisher.try_emplace(lidar_ip).first;
                         iter->second.on_receive_imu(imu_msg);
                     } else {
                         lidar_publisher.on_receive_imu(imu_msg);
                     }
                 });
         if (is_topic_name_with_lidar_ip) {
-            publish_pointcloud_timer = rclcpp::create_timer(this, get_clock(), std::chrono::milliseconds(100), [this, lidar_frame]() {
+            publish_pointcloud_timer = rclcpp::create_timer(this, get_clock(), std::chrono::milliseconds(100), [this, lidar_topic, imu_topic, lidar_frame]() {
                 for (auto &[lidar_ip, lidar_publisher]: muti_lidar_publisher) {
-                    lidar_publisher.make_sure_init(*this);
+                    lidar_publisher.make_sure_init(*this, lidar_topic, imu_topic, lidar_ip);
                     lidar_publisher.publish_pointcloud(lidar_frame);
                 }
             });
-            publish_imu_timer = rclcpp::create_timer(this, get_clock(), std::chrono::milliseconds(1), [this, imu_frame]() {
+            publish_imu_timer = rclcpp::create_timer(this, get_clock(), std::chrono::milliseconds(1), [this, lidar_topic, imu_topic, imu_frame]() {
                 for (auto &[lidar_ip, lidar_publisher]: muti_lidar_publisher) {
-                    lidar_publisher.make_sure_init(*this);
+                    lidar_publisher.make_sure_init(*this, lidar_topic, imu_topic, lidar_ip);
                     lidar_publisher.publish_imu(imu_frame);
                 }
             });
