@@ -10,8 +10,6 @@ It has the following features:
 
 - It supports multiple LiDARs.
 
-- When time synchronization is not enabled, it calculates the time difference only once upon the first received message and uses this difference thereafter, ensuring basic time synchronization.
-
 Special note:
 
 - It publishes point clouds in the PointCloud2 format, which differs from the point cloud format of livox_ros_driver2. Users may need to modify code in other packages.

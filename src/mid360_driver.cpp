@@ -58,9 +58,9 @@ namespace mid360_driver {
     };
 
     struct CartesianLowPoint {
-        int16_t x;           // unit:mm
-        int16_t y;           // unit:mm
-        int16_t z;           // unit:mm
+        int16_t x;           // unit:cm
+        int16_t y;           // unit:cm
+        int16_t z;           // unit:cm
         uint8_t reflectivity;// 反射率
         uint8_t tag;         // 标签
     };
@@ -96,6 +96,15 @@ namespace mid360_driver {
             combine_4_bytes(result, &bytes[12]);
             return result;
         }
+    }
+
+    static double get_point_timestamp(double packet_timestamp, uint16_t time_interval, uint16_t dot_num, std::size_t point_index) {
+        if (dot_num <= 1) [[unlikely]] {
+            return packet_timestamp;
+        }
+        const double packet_interval = static_cast<double>(time_interval) * 1e-7;
+        const double point_interval = packet_interval / static_cast<double>(dot_num - 1);
+        return packet_timestamp + point_interval * static_cast<double>(point_index);
     }
 
     Mid360Driver::Mid360Driver(asio::io_context &io_context,
@@ -139,16 +148,11 @@ namespace mid360_driver {
                 continue;
             }
             const auto &header = *reinterpret_cast<const DataHeader *>(buffer);
-            double header_timestamp = static_cast<double>(header.timestamp) * 1e-9;
+            double header_timestamp;
             if (header.time_type == TimestampType::kTimestampTypeNoSync) {
-                auto [iter, inserted] = delta_time_map.try_emplace(sender_endpoint.address());
-                if (inserted) {
-                    auto now = static_cast<double>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) * 1e-9;
-                    iter->second = now - header_timestamp;
-                    header_timestamp = now;
-                } else {
-                    header_timestamp += iter->second;
-                }
+                header_timestamp = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+            } else {
+                header_timestamp = static_cast<double>(header.timestamp) * 1e-9;
             }
             points.clear();
             points.reserve(header.dot_num);
@@ -156,14 +160,14 @@ namespace mid360_driver {
                 const auto *raw_points = reinterpret_cast<const CartesianHighPoint *>(buffer + sizeof(DataHeader));
                 for (size_t i = 0; i < header.dot_num; ++i) {
                     const auto &raw_point = raw_points[i];
-                    if ((raw_point.tag & 0b00110000) != 0b00000000 || (raw_point.tag & 0b00001100) != 0b00000000 || (raw_point.tag & 0b00000011) != 0b00000000) {
+                    if (raw_point.tag & 0b00111111) [[unlikely]] {
                         continue;
                     }
-                    Point point;// NOLINT(cppcoreguidelines-pro-type-member-init)
-                    point.timestamp = header_timestamp + static_cast<double>(header.time_interval * i) / header.dot_num * 1e-10;
-                    point.x = static_cast<float>(raw_point.x * 0.001);
-                    point.y = static_cast<float>(raw_point.y * 0.001);
-                    point.z = static_cast<float>(raw_point.z * 0.001);
+                    Point point;
+                    point.timestamp = get_point_timestamp(header_timestamp, header.time_interval, header.dot_num, i);
+                    point.x = raw_point.x * 0.001f;
+                    point.y = raw_point.y * 0.001f;
+                    point.z = raw_point.z * 0.001f;
                     point.intensity = raw_point.reflectivity;
                     points.push_back(point);
                 }
@@ -171,14 +175,14 @@ namespace mid360_driver {
                 const auto *raw_points = reinterpret_cast<const CartesianLowPoint *>(buffer + sizeof(DataHeader));
                 for (size_t i = 0; i < header.dot_num; ++i) {
                     const auto &raw_point = raw_points[i];
-                    if ((raw_point.tag & 0b00110000) != 0b00000000 || (raw_point.tag & 0b00001100) != 0b00000000 || (raw_point.tag & 0b00000011) != 0b00000000) {
+                    if (raw_point.tag & 0b00111111) [[unlikely]] {
                         continue;
                     }
-                    Point point;// NOLINT(cppcoreguidelines-pro-type-member-init)
-                    point.timestamp = header_timestamp + static_cast<double>(header.time_interval * i) / header.dot_num * 1e-10;
-                    point.x = static_cast<float>(raw_point.x * 0.001);
-                    point.y = static_cast<float>(raw_point.y * 0.001);
-                    point.z = static_cast<float>(raw_point.z * 0.001);
+                    Point point;
+                    point.timestamp = get_point_timestamp(header_timestamp, header.time_interval, header.dot_num, i);
+                    point.x = raw_point.x * 0.01f;
+                    point.y = raw_point.y * 0.01f;
+                    point.z = raw_point.z * 0.01f;
                     point.intensity = raw_point.reflectivity;
                     points.push_back(point);
                 }
@@ -186,10 +190,11 @@ namespace mid360_driver {
                 const auto *raw_points = reinterpret_cast<const SphericalPoint *>(buffer + sizeof(DataHeader));
                 for (size_t i = 0; i < header.dot_num; ++i) {
                     const auto &raw_point = raw_points[i];
-                    if ((raw_point.tag & 0b00110000) != 0b00000000 || (raw_point.tag & 0b00001100) != 0b00000000 || (raw_point.tag & 0b00000011) != 0b00000000) {
+                    if (raw_point.tag & 0b00111111) [[unlikely]] {
                         continue;
                     }
-                    Point point;// NOLINT(cppcoreguidelines-pro-type-member-init)
+                    Point point;
+                    point.timestamp = get_point_timestamp(header_timestamp, header.time_interval, header.dot_num, i);
                     double radius = raw_point.depth / 1000.0;
                     double theta = raw_point.theta / 100.0 / 180 * M_PI;
                     double phi = raw_point.phi / 100.0 / 180 * M_PI;
@@ -217,26 +222,22 @@ namespace mid360_driver {
                 continue;
             }
             const auto &header = *reinterpret_cast<const DataHeader *>(buffer);
-            double header_timestamp = static_cast<double>(header.timestamp) * 1e-9;
+            double header_timestamp;
             if (header.time_type == TimestampType::kTimestampTypeNoSync) {
-                auto [iter, inserted] = delta_time_map.try_emplace(sender_endpoint.address());
-                if (inserted) {
-                    auto now = static_cast<double>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) * 1e-9;
-                    iter->second = now - header_timestamp;
-                    header_timestamp = now;
-                } else {
-                    header_timestamp += iter->second;
-                }
+                header_timestamp = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+            } else {
+                header_timestamp = static_cast<double>(header.timestamp) * 1e-9;
             }
             const auto &raw_imu = *reinterpret_cast<const Imu *>(buffer + sizeof(DataHeader));
-            ImuMsg imu_msg;// NOLINT(cppcoreguidelines-pro-type-member-init)
+            ImuMsg imu_msg;
             imu_msg.timestamp = header_timestamp;
             imu_msg.angular_velocity_x = raw_imu.angular_velocity_x;
             imu_msg.angular_velocity_y = raw_imu.angular_velocity_y;
             imu_msg.angular_velocity_z = raw_imu.angular_velocity_z;
-            imu_msg.linear_acceleration_x = raw_imu.linear_acceleration_x;
-            imu_msg.linear_acceleration_y = raw_imu.linear_acceleration_y;
-            imu_msg.linear_acceleration_z = raw_imu.linear_acceleration_z;
+            constexpr double kGravity = 9.81;
+            imu_msg.linear_acceleration_x = raw_imu.linear_acceleration_x * kGravity;
+            imu_msg.linear_acceleration_y = raw_imu.linear_acceleration_y * kGravity;
+            imu_msg.linear_acceleration_z = raw_imu.linear_acceleration_z * kGravity;
             on_receive_imu(sender_endpoint.address(), imu_msg);
         }
     }

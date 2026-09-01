@@ -42,7 +42,6 @@ namespace mid360_driver {
         asio::ip::udp::socket receive_pointcloud_socket;
         asio::ip::udp::socket receive_imu_socket;
         std::vector<Point> points;
-        std::unordered_map<asio::ip::address, double, IpAddressHasher> delta_time_map;
         std::function<void(const asio::ip::address &lidar_ip, const std::vector<Point> &points)> on_receive_pointcloud;
         std::function<void(const asio::ip::address &lidar_ip, const ImuMsg &imu_msg)> on_receive_imu;
 

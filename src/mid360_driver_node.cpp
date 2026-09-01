@@ -128,6 +128,7 @@ namespace mid360_driver {
             msg.linear_acceleration.x = imu.linear_acceleration_x;
             msg.linear_acceleration.y = imu.linear_acceleration_y;
             msg.linear_acceleration.z = imu.linear_acceleration_z;
+            msg.orientation_covariance[0] = -1.0;
             imu_publisher->publish(msg);
         }
     }
@@ -168,7 +169,7 @@ namespace mid360_driver {
                     mutex.unlock();
                 });
         if (is_topic_name_with_lidar_ip) {
-            publish_pointcloud_timer = rclcpp::create_timer(this, get_clock(), std::chrono::milliseconds(100), [this, lidar_topic, imu_topic, lidar_frame]() {
+            publish_pointcloud_timer = rclcpp::create_timer(this, get_clock(), std::chrono::duration<double, std::ratio<1, 1>>(lidar_publish_time_interval), [this, lidar_topic, imu_topic, lidar_frame]() {
                 mutex.lock();
                 for (auto &[lidar_ip, lidar_publisher]: muti_lidar_publisher) {
                     lidar_publisher.prepare_pointcloud_to_publish();
