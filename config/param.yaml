@@ -5,5 +5,5 @@ mid360_driver:
         imu_topic: /livox/imu
         imu_frame: imu_frame
         lidar_publish_time_interval: 0.1
-        host_ip: 192.168.1.50
+        host_ip: 0.0.0.0
         is_topic_name_with_lidar_ip: false # 是否在话题名后面加雷达ip，可以用于区分多个雷达
