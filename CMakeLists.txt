@@ -53,6 +53,10 @@ rclcpp_components_register_node(${PROJECT_NAME}
     PLUGIN mid360_driver::Mid360DriverNode
     EXECUTABLE ${PROJECT_NAME}_node
 )
+rclcpp_components_register_node(${PROJECT_NAME}
+    PLUGIN mid70_driver::Mid70DriverNode
+    EXECUTABLE mid70_driver_node
+)
 
 #############
 ## Testing ##

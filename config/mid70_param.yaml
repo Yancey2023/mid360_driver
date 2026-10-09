@@ -1,0 +1,17 @@
+mid70_driver:
+    ros__parameters:
+        lidar_topic: /livox/lidar
+        lidar_frame: livox_frame
+        lidar_publish_time_interval: 0.1
+        host_ip: 192.168.1.50 # 本机网卡 IP，空字符串 = 按到雷达的路由自动探测
+        lidar_ip: "" # 雷达 IP，空字符串 = 监听广播自动发现
+        device_port: 65000 # 雷达命令与点云端口
+        discovery_port: 55000 # 雷达广播的目标端口
+        cmd_port: 55001 # 本机收命令应答
+        data_port: 56001 # 本机收点云
+        imu_port: 56002 # Mid-70 无 IMU，仅握手报文需要
+        return_mode: "" # 空 = 保持设备当前 / first / strongest / dual（triple 会被设备拒绝）
+        coordinate_mode: "" # 空 = 保持设备当前 / cartesian / spherical（设备重启后复位为 cartesian）
+        discovery_timeout: 10.0 # 单次发现等待时间 [s]
+        reconnect_timeout: 3.0 # 点云中断多久后重新握手 [s]
+        drop_invalid_points: true # 丢弃 (0,0,0) 无回波填充点与 >1000m 离群点
