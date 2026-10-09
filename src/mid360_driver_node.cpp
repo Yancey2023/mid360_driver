@@ -11,7 +11,9 @@ namespace mid360_driver {
     void LidarPublisher::make_sure_init(rclcpp::Node &node, const std::string &lidar_topic, const std::string &imu_topic) {
         if (!is_init) {
             pointcloud_publisher = node.create_publisher<sensor_msgs::msg::PointCloud2>(lidar_topic, 1000);
-            imu_publisher = node.create_publisher<sensor_msgs::msg::Imu>(imu_topic, 1000);
+            if (is_imu_enabled) {
+                imu_publisher = node.create_publisher<sensor_msgs::msg::Imu>(imu_topic, 1000);
+            }
             is_init = true;
         }
     }
@@ -29,7 +31,9 @@ namespace mid360_driver {
             lidar_ip_str.push_back('_');
             lidar_ip_str.append(std::to_string(static_cast<int>(lidar_ip_bytes[3])));
             pointcloud_publisher = node.create_publisher<sensor_msgs::msg::PointCloud2>(lidar_topic + lidar_ip_str, 1000);
-            imu_publisher = node.create_publisher<sensor_msgs::msg::Imu>(imu_topic + lidar_ip_str, 1000);
+            if (is_imu_enabled) {
+                imu_publisher = node.create_publisher<sensor_msgs::msg::Imu>(imu_topic + lidar_ip_str, 1000);
+            }
             is_init = true;
         }
     }
