@@ -1,0 +1,53 @@
+name: ROS 2 CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.ros_distro }}
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ros_distro: humble
+            image: ros:humble-ros-base-jammy
+          - ros_distro: jazzy
+            image: ros:jazzy-ros-base-noble
+          - ros_distro: lyrical
+            image: ros:lyrical-ros-base-resolute
+    env:
+      ROS_DISTRO: ${{ matrix.ros_distro }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install --no-install-recommends -y \
+            build-essential \
+            cmake \
+            libasio-dev \
+            ros-${ROS_DISTRO}-ament-cmake-auto \
+            ros-${ROS_DISTRO}-rclcpp-components \
+            ros-${ROS_DISTRO}-rclpy \
+            ros-${ROS_DISTRO}-sensor-msgs
+          rm -rf /var/lib/apt/lists/*
+
+      - name: Build package
+        shell: bash
+        run: |
+          source /opt/ros/${ROS_DISTRO}/setup.bash
+          colcon build --event-handlers console_direct+
