@@ -23,11 +23,15 @@ namespace mid360_driver {
         std::vector<Point> points_to_publish;
         std::vector<ImuMsg> imu_to_publish;
         bool is_init = false;
+        bool is_imu_enabled = true;
         std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::PointCloud2>> pointcloud_publisher;
         std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::Imu>> imu_publisher;
 
     public:
         LidarPublisher() = default;
+
+        // Mid-70 没有 IMU，构造时关掉 IMU 发布者
+        explicit LidarPublisher(bool is_imu_enabled) : is_imu_enabled(is_imu_enabled) {}
 
         void make_sure_init(rclcpp::Node &node, const std::string &lidar_topic, const std::string &imu_topic);
 
